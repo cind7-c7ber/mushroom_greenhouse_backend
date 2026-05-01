@@ -14,6 +14,15 @@ class Settings(BaseSettings):
     # HTTP telemetry source
     TELEMETRY_SOURCE_URL: str
 
+    # Polling
+    POLLING_ENABLED: bool = False
+    POLLING_INTERVAL_SECONDS: int = 30
+
+    # JWT Token authentication
+    JWT_SECRET_KEY: str
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+
     # MQTT (legacy / transition only)
     ENABLE_MQTT: bool = False
     MQTT_BROKER: str | None = None

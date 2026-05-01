@@ -1,17 +1,11 @@
+import logging
+
 from sqlalchemy.orm import Session
 
 from app.models.alert_record import Alert
 from app.services.threshold import classify_value
 
-
-PARAMETER_MAP = {
-    "temperature": "temperature",
-    "humidity": "humidity",
-    "co2": "co2",
-    "light": "light",
-    "moisture": "moisture",
-}
-
+logger = logging.getLogger(__name__)
 
 RECOMMENDATIONS = {
     "temperature": "Check ventilation and fan performance.",
@@ -46,27 +40,52 @@ def alert_exists(db: Session, section: str, parameter: str, severity: str, band:
     return existing is not None
 
 
+def resolve_active_alerts(db: Session, section: str, parameter: str) -> int:
+    active_alerts = (
+        db.query(Alert)
+        .filter(
+            Alert.section == section,
+            Alert.parameter == parameter,
+            Alert.status == "active",
+        )
+        .all()
+    )
+
+    for alert in active_alerts:
+        alert.status = "resolved"
+
+    if active_alerts:
+        logger.info(
+            "Resolved %s active alert(s) | section=%s | parameter=%s",
+            len(active_alerts),
+            section,
+            parameter,
+        )
+
+    return len(active_alerts)
+
+
 def evaluate_section_alerts(db: Session, timestamp, section: str, payload: dict) -> list[Alert]:
     created_alerts = []
 
-    for parameter in PARAMETER_MAP.keys():
+    for parameter in ["temperature", "humidity", "co2", "light", "moisture"]:
         value = float(payload[parameter])
         result = classify_value(parameter, value)
 
         if result["severity"] == "normal":
+            resolve_active_alerts(db, section, parameter)
             continue
 
         if result["severity"] == "unknown":
             continue
 
         if alert_exists(
-    db=db,
-    section=section,
-    parameter=parameter,
-    severity=result["severity"],
-    band=result["band"],
-):
-
+            db=db,
+            section=section,
+            parameter=parameter,
+            severity=result["severity"],
+            band=result["band"],
+        ):
             continue
 
         alert = Alert(
@@ -89,6 +108,15 @@ def evaluate_section_alerts(db: Session, timestamp, section: str, payload: dict)
         )
         db.add(alert)
         created_alerts.append(alert)
+
+        logger.info(
+            "Alert created | section=%s | parameter=%s | severity=%s | band=%s | value=%s",
+            section,
+            parameter,
+            result["severity"],
+            result["band"],
+            value,
+        )
 
     return created_alerts
 
