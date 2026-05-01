@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class ImageMetadataBase(BaseModel):
@@ -21,5 +21,4 @@ class ImageMetadataResponse(ImageMetadataBase):
     id: int
     ingested_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

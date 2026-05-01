@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class SystemStatusBase(BaseModel):
@@ -7,7 +7,7 @@ class SystemStatusBase(BaseModel):
     status_type: str
     status_value: str
     message: str | None = None
-    source: str = "mqtt"
+    source: str | None = "http"
 
 
 class SystemStatusCreate(SystemStatusBase):
@@ -16,7 +16,6 @@ class SystemStatusCreate(SystemStatusBase):
 
 class SystemStatusResponse(SystemStatusBase):
     id: int
-    logged_at: datetime
+    logged_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -10,9 +10,9 @@ class SystemStatusLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     timestamp = Column(DateTime, nullable=False, index=True)
 
-    status_type = Column(String, nullable=False)   # mqtt, backend, serial, camera, upload
-    status_value = Column(String, nullable=False)  # ONLINE, OFFLINE, ERROR, etc.
+    status_type = Column(String, nullable=False)
+    status_value = Column(String, nullable=False)
     message = Column(Text, nullable=True)
 
-    source = Column(String, nullable=False, default="mqtt")
+    source = Column(String, nullable=False, default="http")
     logged_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

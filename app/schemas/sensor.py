@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class SensorReadingBase(BaseModel):
@@ -10,7 +10,7 @@ class SensorReadingBase(BaseModel):
     co2_ppm: float
     light_lux: float
     moisture_pct: float
-    source: str = "mqtt"
+    source: str | None = "http"
 
 
 class SensorReadingCreate(SensorReadingBase):
@@ -19,7 +19,6 @@ class SensorReadingCreate(SensorReadingBase):
 
 class SensorReadingResponse(SensorReadingBase):
     id: int
-    ingested_at: datetime
+    ingested_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

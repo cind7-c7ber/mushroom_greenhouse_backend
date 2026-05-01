@@ -17,5 +17,5 @@ class SensorReading(Base):
     light_lux = Column(Float, nullable=False)
     moisture_pct = Column(Float, nullable=False)
 
-    source = Column(String, nullable=False, default="mqtt")
+    source = Column(String, nullable=False, default="http")
     ingested_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

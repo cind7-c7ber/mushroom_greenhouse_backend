@@ -7,17 +7,20 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str
     SUPABASE_SERVICE_ROLE_KEY: str | None = None
     IMAGE_BUCKET: str = "growth-images"
-    ENABLE_MQTT: bool = False
 
     # Database
     DATABASE_URL: str
 
-    # MQTT
-    MQTT_BROKER: str
+    # HTTP telemetry source
+    TELEMETRY_SOURCE_URL: str
+
+    # MQTT (legacy / transition only)
+    ENABLE_MQTT: bool = False
+    MQTT_BROKER: str | None = None
     MQTT_PORT: int = 1883
     MQTT_KEEPALIVE: int = 60
     MQTT_TOPICS: list[str] = ["acity_greenhouse/paakwasi/data"]
-    
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

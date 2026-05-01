@@ -8,6 +8,25 @@ from app.schemas.sensor import SensorReadingResponse
 router = APIRouter(prefix="/api/sensors", tags=["Sensors"])
 
 
+def serialize_sensor_reading(reading: SensorReading):
+    return {
+        "id": getattr(reading, "id", 0),
+        "timestamp": getattr(reading, "timestamp", "2000-01-01T00:00:00"),
+        "section": getattr(reading, "section", "unknown"),
+        "temperature_c": getattr(reading, "temperature_c", 0.0),
+        "humidity_pct": getattr(reading, "humidity_pct", 0.0),
+        "co2_ppm": getattr(reading, "co2_ppm", 0.0),
+        "light_lux": getattr(reading, "light_lux", 0.0),
+        "moisture_pct": getattr(reading, "moisture_pct", 0.0),
+        "source": getattr(reading, "source", "http"),
+        "ingested_at": getattr(
+            reading,
+            "ingested_at",
+            getattr(reading, "timestamp", "2000-01-01T00:00:00"),
+        ),
+    }
+
+
 @router.get("/latest/{section}", response_model=SensorReadingResponse)
 def get_latest_sensor_reading(section: str, db: Session = Depends(get_db)):
     reading = (
@@ -31,7 +50,7 @@ def get_latest_sensor_reading(section: str, db: Session = Depends(get_db)):
             "ingested_at": "2000-01-01T00:00:00",
         }
 
-    return reading
+    return serialize_sensor_reading(reading)
 
 
 @router.get("/history/{section}", response_model=list[SensorReadingResponse])
@@ -47,7 +66,7 @@ def get_sensor_history(
         .limit(limit)
         .all()
     )
-    return readings
+    return [serialize_sensor_reading(r) for r in readings]
 
 
 @router.get("/compare", response_model=list[SensorReadingResponse])
@@ -61,4 +80,4 @@ def compare_sensor_readings(
         .limit(limit)
         .all()
     )
-    return readings
+    return [serialize_sensor_reading(r) for r in readings]
