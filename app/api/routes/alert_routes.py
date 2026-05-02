@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.api.dependencies.security_dependencies import get_current_user
 from app.core.database import get_db
 from app.models.alert_record import Alert
+from app.models.user import User
 from app.schemas.alert_schema import AlertResponse
 
 router = APIRouter(prefix="/api/alerts", tags=["Alerts"])
@@ -30,6 +32,7 @@ def serialize_alert(alert: Alert):
 def get_latest_alerts(
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     alerts = (
         db.query(Alert)
@@ -44,6 +47,7 @@ def get_latest_alerts(
 def get_alert_history(
     limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     alerts = (
         db.query(Alert)
@@ -58,6 +62,7 @@ def get_alert_history(
 def get_active_alerts(
     limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     alerts = (
         db.query(Alert)
@@ -70,7 +75,10 @@ def get_active_alerts(
 
 
 @router.get("/summary")
-def get_alert_summary(db: Session = Depends(get_db)):
+def get_alert_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     active_total = db.query(func.count(Alert.id)).filter(Alert.status == "active").scalar() or 0
     critical_total = (
         db.query(func.count(Alert.id))

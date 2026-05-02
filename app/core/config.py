@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_KEY: str
     SUPABASE_SERVICE_ROLE_KEY: str | None = None
-    IMAGE_BUCKET: str = "growth-images"
+    IMAGE_BUCKET: str = "greenhouse-images"
 
     # Database
     DATABASE_URL: str
@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+
+    # Cloud Deployment
+    BACKEND_ENV: str = "development"
+    ALLOWED_ORIGINS: str = "http://localhost:8080,http://127.0.0.1:8080"
+    ENABLE_DOCS: bool = True
 
     # MQTT (legacy / transition only)
     ENABLE_MQTT: bool = False

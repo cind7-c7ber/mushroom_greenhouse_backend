@@ -1,5 +1,8 @@
 import logging
 
+from app.api.dependencies.security_dependencies import get_current_user
+from app.models.user import User
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -7,6 +10,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.services.telemetry_fetcher import fetch_telemetry, ingest_telemetry_payload
 from app.services.sync_health import get_sync_health, record_sync_failure, record_sync_success
+
 
 logger = logging.getLogger(__name__)
 
