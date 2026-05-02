@@ -1,6 +1,6 @@
-import logging
 from datetime import datetime
 from urllib.parse import urlparse
+import logging
 
 import requests
 from sqlalchemy.orm import Session
@@ -9,19 +9,10 @@ from app.core.config import settings
 from app.models.sensor_readings import SensorReading
 from app.models.system_status import SystemStatusLog
 from app.models.image_metadata import ImageMetadata
-from app.services.alert_engine import evaluate_payload_alerts
 
 logger = logging.getLogger(__name__)
 
 REQUIRED_SENSOR_FIELDS = {"temperature", "humidity", "co2", "light", "moisture"}
-
-VALID_SENSOR_RANGES = {
-    "temperature": (-10.0, 60.0),
-    "humidity": (0.0, 100.0),
-    "co2": (0.0, 10000.0),
-    "light": (0.0, 200000.0),
-    "moisture": (0.0, 100.0),
-}
 
 
 def parse_datetime(timestamp_str: str) -> datetime:
@@ -51,18 +42,10 @@ def validate_sensor_block(section_name: str, payload: dict):
         value = payload[field]
         if value is None:
             raise ValueError(f"{section_name}.{field} is null")
-
         try:
-            numeric_value = float(value)
+            float(value)
         except (TypeError, ValueError):
             raise ValueError(f"{section_name}.{field} must be numeric")
-
-        min_value, max_value = VALID_SENSOR_RANGES[field]
-        if not (min_value <= numeric_value <= max_value):
-            raise ValueError(
-                f"{section_name}.{field} out of valid range: {numeric_value} "
-                f"(expected {min_value} to {max_value})"
-            )
 
 
 def validate_payload(data: dict):
@@ -78,9 +61,6 @@ def validate_payload(data: dict):
 
     if "latest_image" in data and data["latest_image"] is not None and not isinstance(data["latest_image"], str):
         raise ValueError("latest_image must be a string if provided")
-
-    if "image_path" in data and data["image_path"] is not None and not isinstance(data["image_path"], str):
-        raise ValueError("image_path must be a string if provided")
 
     if "stream" in data and data["stream"] is not None and not isinstance(data["stream"], str):
         raise ValueError("stream must be a string if provided")
@@ -116,43 +96,35 @@ def save_image_metadata(
     timestamp: datetime,
     image_url: str | None,
     stream_url: str | None,
-    storage_path: str | None,
 ):
-    if not image_url and not stream_url and not storage_path:
+    if not image_url and not stream_url:
         return
 
     filename = "unknown.jpg"
-
-    if storage_path:
-        filename = storage_path.split("/")[-1]
-    elif image_url:
+    if image_url:
         parsed = urlparse(image_url)
         filename = parsed.path.split("/")[-1] if parsed.path else "unknown.jpg"
 
-    latest_record = (
+    existing = (
         db.query(ImageMetadata)
-        .order_by(ImageMetadata.capture_timestamp.desc(), ImageMetadata.id.desc())
+        .filter(
+            ImageMetadata.capture_timestamp == timestamp,
+            ImageMetadata.image_url == image_url,
+            ImageMetadata.stream_url == stream_url,
+        )
         .first()
     )
-
-    if latest_record:
-        same_image = latest_record.image_url == image_url
-        same_stream = latest_record.stream_url == stream_url
-        same_storage = latest_record.storage_path == storage_path
-        same_filename = latest_record.image_filename == filename
-
-        if same_image and same_stream and same_storage and same_filename:
-            logger.info("Skipping duplicate image metadata entry")
-            return
+    if existing:
+        return
 
     image = ImageMetadata(
         capture_timestamp=timestamp,
         section="combined",
         image_filename=filename,
-        storage_path=storage_path,
         image_url=image_url,
         stream_url=stream_url,
-        upload_status="bucket_path" if storage_path else "external_url",
+        storage_path=None,
+        upload_status="external_url",
         notes="Received from HTTP telemetry payload",
     )
     db.add(image)
@@ -166,42 +138,58 @@ def ingest_telemetry_payload(db: Session, data: dict):
     controlled = data["controlled"]
     control = data["control"]
     image_url = data.get("latest_image")
-    storage_path = data.get("image_path")
     stream_url = data.get("stream")
 
     save_status_log(db, timestamp, status)
     save_sensor_reading(db, timestamp, "controlled", controlled)
     save_sensor_reading(db, timestamp, "control", control)
-    save_image_metadata(db, timestamp, image_url, stream_url, storage_path)
-
-    created_alerts = evaluate_payload_alerts(db, timestamp, controlled, control)
+    save_image_metadata(db, timestamp, image_url, stream_url)
 
     db.commit()
-
-    logger.info(
-        "Telemetry ingested successfully | timestamp=%s | status=%s | alerts_created=%s | image_storage_mode=%s",
-        data["timestamp"],
-        status,
-        len(created_alerts),
-        "bucket_path" if storage_path else "external_url",
-    )
 
     return {
         "message": "Telemetry ingested successfully",
         "timestamp": data["timestamp"],
         "status": status,
-        "alerts_created": len(created_alerts),
-        "image_storage_mode": "bucket_path" if storage_path else "external_url",
     }
 
 
+def get_ssl_verify_value():
+    if settings.TELEMETRY_CA_BUNDLE and settings.TELEMETRY_CA_BUNDLE.strip():
+        return settings.TELEMETRY_CA_BUNDLE.strip(), "custom_ca_bundle"
+
+    if settings.TELEMETRY_VERIFY_SSL:
+        return True, "default_verified"
+
+    return False, "insecure_fallback"
+
+
 def fetch_telemetry():
-    logger.info("Fetching telemetry from %s", settings.TELEMETRY_SOURCE_URL)
-    response = requests.get(
+    verify_value, verify_mode = get_ssl_verify_value()
+
+    logger.info(
+        "Fetching telemetry from %s using SSL mode: %s",
         settings.TELEMETRY_SOURCE_URL,
-        timeout=10,
-        headers={"Accept": "application/json"},
+        verify_mode,
     )
-    response.raise_for_status()
-    logger.info("Telemetry fetch successful")
-    return response.json()
+
+    try:
+        response = requests.get(
+            settings.TELEMETRY_SOURCE_URL,
+            timeout=10,
+            verify=verify_value,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    except requests.exceptions.SSLError as exc:
+        logger.error("Telemetry fetch failed due to SSL verification issue: %s", exc)
+        raise ValueError(f"Telemetry SSL verification failed: {exc}") from exc
+
+    except requests.exceptions.Timeout as exc:
+        logger.error("Telemetry fetch timed out: %s", exc)
+        raise ValueError("Telemetry fetch timed out") from exc
+
+    except requests.exceptions.RequestException as exc:
+        logger.error("Telemetry fetch request failed: %s", exc)
+        raise ValueError(f"Telemetry fetch failed: {exc}") from exc

@@ -6,27 +6,29 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_KEY: str
     SUPABASE_SERVICE_ROLE_KEY: str | None = None
-    IMAGE_BUCKET: str = "greenhouse-images"
+    IMAGE_BUCKET: str = "growth-images"
 
     # Database
     DATABASE_URL: str
 
     # HTTP telemetry source
     TELEMETRY_SOURCE_URL: str
+    TELEMETRY_VERIFY_SSL: bool = True
+    TELEMETRY_CA_BUNDLE: str | None = None
 
-    # Polling
-    POLLING_ENABLED: bool = False
-    POLLING_INTERVAL_SECONDS: int = 30
-
-    # JWT Token authentication
-    JWT_SECRET_KEY: str
-    JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-
-    # Cloud Deployment
+    # Backend environment / CORS
     BACKEND_ENV: str = "development"
     ALLOWED_ORIGINS: str = "http://localhost:8080,http://127.0.0.1:8080"
     ENABLE_DOCS: bool = True
+
+    # Polling
+    POLLING_ENABLED: bool = False
+    POLLING_INTERVAL_SECONDS: int = 60
+
+    # JWT
+    JWT_SECRET_KEY: str
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
     # MQTT (legacy / transition only)
     ENABLE_MQTT: bool = False
