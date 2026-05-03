@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     ENABLE_DOCS: bool = True
 
     # Polling
-    POLLING_ENABLED: bool = False
+    POLLING_ENABLED: bool = True
     POLLING_INTERVAL_SECONDS: int = 60
 
     # JWT
