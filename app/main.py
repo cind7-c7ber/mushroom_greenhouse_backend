@@ -1,5 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 
 from app.core.config import settings
 from app.core.database import Base, engine
@@ -33,6 +36,9 @@ app = FastAPI(
     openapi_url=openapi_url,
 )
 
+app.mount("/static", StaticFiles(directory="public"), name="static")
+templates = Jinja2Templates(directory="app/templates")
+
 allowed_origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()]
 
 app.add_middleware(
@@ -52,9 +58,9 @@ def on_startup():
         start_polling(settings.POLLING_INTERVAL_SECONDS)
 
 
-@app.get("/")
-def root():
-    return {"message": "Mushroom Greenhouse Backend is running"}
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    return templates.TemplateResponse(request=request, name="index.html")
 
 
 app.include_router(sensor_router)
