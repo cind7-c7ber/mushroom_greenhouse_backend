@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     # Polling
     POLLING_ENABLED: bool = True
-    POLLING_INTERVAL_SECONDS: int = 60
+    POLLING_INTERVAL_SECONDS: int = 30
 
     # JWT
     JWT_SECRET_KEY: str
