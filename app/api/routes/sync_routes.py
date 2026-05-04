@@ -11,11 +11,9 @@ from app.core.database import get_db
 from app.services.telemetry_fetcher import fetch_telemetry, ingest_telemetry_payload
 from app.services.sync_health import get_sync_health, record_sync_failure, record_sync_success
 
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/sync", tags=["Sync"])
-
 
 @router.post("/telemetry")
 def sync_telemetry(db: Session = Depends(get_db)):
@@ -33,7 +31,6 @@ def sync_telemetry(db: Session = Depends(get_db)):
         record_sync_failure(settings.TELEMETRY_SOURCE_URL, str(e))
         logger.exception("Telemetry sync failed")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.post("/test-payload")
 def sync_test_payload(db: Session = Depends(get_db)):
@@ -70,7 +67,6 @@ def sync_test_payload(db: Session = Depends(get_db)):
         db.rollback()
         logger.exception("Test payload sync failed")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/health")
 def sync_health():

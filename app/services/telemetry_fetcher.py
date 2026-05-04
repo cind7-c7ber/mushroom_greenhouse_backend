@@ -9,11 +9,11 @@ from app.core.config import settings
 from app.models.sensor_readings import SensorReading
 from app.models.system_status import SystemStatusLog
 from app.models.image_metadata import ImageMetadata
+from app.services.alert_engine import evaluate_payload_alerts
 
 logger = logging.getLogger(__name__)
 
 REQUIRED_SENSOR_FIELDS = {"temperature", "humidity", "co2", "light", "moisture"}
-
 
 def parse_datetime(timestamp_str: str) -> datetime:
     formats = [
@@ -28,7 +28,6 @@ def parse_datetime(timestamp_str: str) -> datetime:
             continue
 
     raise ValueError(f"Unsupported timestamp format: {timestamp_str}")
-
 
 def validate_sensor_block(section_name: str, payload: dict):
     if not isinstance(payload, dict):
@@ -47,7 +46,6 @@ def validate_sensor_block(section_name: str, payload: dict):
         except (TypeError, ValueError):
             raise ValueError(f"{section_name}.{field} must be numeric")
 
-
 def validate_payload(data: dict):
     if not isinstance(data, dict):
         raise ValueError("Telemetry payload must be a JSON object")
@@ -65,7 +63,6 @@ def validate_payload(data: dict):
     if "stream" in data and data["stream"] is not None and not isinstance(data["stream"], str):
         raise ValueError("stream must be a string if provided")
 
-
 def save_sensor_reading(db: Session, timestamp: datetime, section: str, payload: dict):
     reading = SensorReading(
         timestamp=timestamp,
@@ -79,7 +76,6 @@ def save_sensor_reading(db: Session, timestamp: datetime, section: str, payload:
     )
     db.add(reading)
 
-
 def save_status_log(db: Session, timestamp: datetime, status_value: str):
     status = SystemStatusLog(
         timestamp=timestamp,
@@ -89,7 +85,6 @@ def save_status_log(db: Session, timestamp: datetime, status_value: str):
         source="http",
     )
     db.add(status)
-
 
 def save_image_metadata(
     db: Session,
@@ -129,7 +124,6 @@ def save_image_metadata(
     )
     db.add(image)
 
-
 def ingest_telemetry_payload(db: Session, data: dict):
     validate_payload(data)
 
@@ -144,6 +138,9 @@ def ingest_telemetry_payload(db: Session, data: dict):
     save_sensor_reading(db, timestamp, "controlled", controlled)
     save_sensor_reading(db, timestamp, "control", control)
     save_image_metadata(db, timestamp, image_url, stream_url)
+    
+    # Evaluate alerts based on the newly saved data
+    evaluate_payload_alerts(db, timestamp, controlled, control)
 
     db.commit()
 
@@ -153,7 +150,6 @@ def ingest_telemetry_payload(db: Session, data: dict):
         "status": status,
     }
 
-
 def get_ssl_verify_value():
     if settings.TELEMETRY_CA_BUNDLE and settings.TELEMETRY_CA_BUNDLE.strip():
         return settings.TELEMETRY_CA_BUNDLE.strip(), "custom_ca_bundle"
@@ -162,7 +158,6 @@ def get_ssl_verify_value():
         return True, "default_verified"
 
     return False, "insecure_fallback"
-
 
 def fetch_telemetry():
     verify_value, verify_mode = get_ssl_verify_value()

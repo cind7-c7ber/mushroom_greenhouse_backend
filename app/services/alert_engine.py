@@ -69,54 +69,76 @@ def evaluate_section_alerts(db: Session, timestamp, section: str, payload: dict)
     created_alerts = []
 
     for parameter in ["temperature", "humidity", "co2", "light", "moisture"]:
-        value = float(payload[parameter])
-        result = classify_value(parameter, value)
+        try:
+            if parameter not in payload or payload[parameter] is None:
+                continue
 
-        if result["severity"] == "normal":
-            resolve_active_alerts(db, section, parameter)
-            continue
+            value = float(payload[parameter])
+            result = classify_value(parameter, value)
 
-        if result["severity"] == "unknown":
-            continue
+            if result["severity"] == "normal":
+                resolve_active_alerts(db, section, parameter)
+                continue
 
-        if alert_exists(
-            db=db,
-            section=section,
-            parameter=parameter,
-            severity=result["severity"],
-            band=result["band"],
-        ):
-            continue
+            if result["severity"] == "unknown":
+                continue
 
-        alert = Alert(
-            timestamp=timestamp,
-            section=section,
-            parameter=parameter,
-            value=value,
-            severity=result["severity"],
-            band=result["band"],
-            message=build_alert_message(
+            # Check for ANY existing active alert for this parameter/section
+            existing_alert = (
+                db.query(Alert)
+                .filter(
+                    Alert.section == section,
+                    Alert.parameter == parameter,
+                    Alert.status == "active",
+                )
+                .first()
+            )
+
+            if existing_alert:
+                # If it's the exact same severity and band, do nothing
+                if existing_alert.severity == result["severity"] and existing_alert.band == result["band"]:
+                    continue
+                else:
+                    # Condition changed (e.g. watch -> critical), resolve the old one
+                    existing_alert.status = "resolved"
+                    db.add(existing_alert)
+
+            # Create new alert
+            alert = Alert(
+                timestamp=timestamp,
                 section=section,
                 parameter=parameter,
                 value=value,
                 severity=result["severity"],
-                unit=result["unit"],
-            ),
-            recommended_action=RECOMMENDATIONS.get(parameter),
-            status="active",
-            source="http",
-        )
-        db.add(alert)
-        created_alerts.append(alert)
+                band=result["band"],
+                message=build_alert_message(
+                    section=section,
+                    parameter=parameter,
+                    value=value,
+                    severity=result["severity"],
+                    unit=result["unit"],
+                ),
+                recommended_action=RECOMMENDATIONS.get(parameter),
+                status="active",
+                source="http",
+            )
+            db.add(alert)
+            created_alerts.append(alert)
 
-        logger.info(
-            "Alert created | section=%s | parameter=%s | severity=%s | band=%s | value=%s",
-            section,
-            parameter,
-            result["severity"],
-            result["band"],
-            value,
-        )
+            logger.info(
+                "Alert created | section=%s | parameter=%s | severity=%s | band=%s | value=%s",
+                section,
+                parameter,
+                result["severity"],
+                result["band"],
+                value,
+            )
+        except (ValueError, TypeError, KeyError) as e:
+            logger.warning(
+                "Failed to evaluate alert for parameter %s in section %s: %s",
+                parameter, section, str(e)
+            )
+            continue
 
     return created_alerts
 
